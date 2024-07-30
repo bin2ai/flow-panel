@@ -18,7 +18,7 @@ To use `FlowPanel`, you need to have Python 3.x installed on your system. Clone 
 Install the package locally using:
 
 ```bash
-pip install .
+pip install flow_panel
 ```
 
 ## Usage

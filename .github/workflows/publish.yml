@@ -11,9 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/flow_panel  # Replace <flow_panel> with your actual package name
+      url: https://pypi.org/p/flow_panel
     permissions:
-      id-token: write  # Ensure the ID token permission is correctly configured
+      id-token: write
 
     steps:
       - name: Checkout code
@@ -22,7 +22,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.x"  # Specify the Python version, e.g., "3.9"
+          python-version: "3.x"
 
       - name: Install dependencies
         run: |

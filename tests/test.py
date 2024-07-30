@@ -17,8 +17,8 @@ def example_run_function(panel: FlowPanel):
 
 if __name__ == "__main__":
     gui = FlowPanel(
-        title_short="Test Panel",
-        title_long="Test Panel GUI",
+        title_short="Simple Panel",
+        title_long="Simple Flow Panel",
         list_descriptions=["Run a test process", "with multiple steps."],
         list_user_entries=[
             ["Input 1", "entry", True, None],
@@ -26,6 +26,6 @@ if __name__ == "__main__":
             ["Input 3", "checkbox", False, None],
         ],
         run_function=example_run_function,
-        help="This is an example help text."
+        help="This is a simple example of a flow panel.",
     )
     gui.mainloop()

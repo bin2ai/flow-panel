@@ -2,15 +2,11 @@ from setuptools import setup, find_packages
 
 setup(
     name='flow_panel',
-    version='0.1',
+    version='0.0.3',
     packages=find_packages(),
-    install_requires=[
-        'pymupdf==1.24.9',
-    ],
+    install_requires=[],
     entry_points={
         'console_scripts': [
-            # Define command-line scripts here, if any
-            'your_command=your_module.main:main_function',
         ],
     },
     # Optional fields
