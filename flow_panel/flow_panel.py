@@ -1,4 +1,3 @@
-import time
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
 import threading
@@ -20,11 +19,10 @@ class FlowPanel(tk.Tk):
 
     def __init__(self, title_short: str, title_long: str, list_descriptions: list, list_user_entries: list, run_function: callable, help: str = None):
         super().__init__()
-        self.protocol("WM_DELETE_WINDOW", self.__destroy)
+        self.protocol("WM_DELETE_WINDOW", self.__on_close)
         self.minsize(400, 400)
 
         self.__title_short = title_short
-
         self.__title_long = title_long
         self.__list_descriptions = list_descriptions
         self.__list_user_entries = list_user_entries
@@ -37,9 +35,9 @@ class FlowPanel(tk.Tk):
         self.popup_open = False  # Flag to track if the popup is open
         self.should_stop = False  # Flag to indicate if the process should stop
         self.stop_event = threading.Event()  # Event to signal threads to stop
+        self.process_thread = None  # Thread handling the running process
 
         self.title(self.__title_short)
-
         self.__create_widgets()
 
     def __open_help(self):
@@ -151,20 +149,19 @@ class FlowPanel(tk.Tk):
 
         self.should_stop = False
         self.stop_event.clear()
-        thread = threading.Thread(
-            target=self.__run_in_thread, args=())
-        thread.start()
+        self.process_thread = threading.Thread(target=self.__run_in_thread)
+        self.process_thread.start()
 
     def __run_in_thread(self):
         self.run_function(self)
-        if not self.should_stop:
-            self.__show_completion_popup()
-        self.__enable_inputs()
+        # Schedule GUI updates to happen in the main thread
+        self.after(0, self.__enable_inputs_after_thread)
 
     def __stop(self):
         self.should_stop = True
         self.stop_event.set()
-        self.__enable_inputs()
+        # Disable stop button immediately
+        self.stop_button.config(state=tk.DISABLED)
 
     def __disable_inputs(self):
         for entry, _ in self.entries.values():
@@ -178,11 +175,20 @@ class FlowPanel(tk.Tk):
         self.start_button.config(state=tk.NORMAL)
         self.stop_button.config(state=tk.DISABLED)
 
+    def __enable_inputs_after_thread(self):
+        if self.process_thread and self.process_thread.is_alive():
+            self.process_thread.join()  # Wait for the thread to finish
+        self.__enable_inputs()
+
     def update_progress(self, value: int, max_value: int):
         """ Updates the progress bar.
         @param value: The current value.
-        @param max_value: The maximum
+        @param max_value: The maximum value.
         """
+        self.after(0, self.__update_progress, value, max_value)
+
+    def __update_progress(self, value: int, max_value: int):
+        """ Helper method to update the progress bar safely. """
         self.progress["value"] = value
         self.progress["maximum"] = max_value
 
@@ -192,19 +198,21 @@ class FlowPanel(tk.Tk):
         @param color_code: A dictionary of message types and their corresponding colors.
         @param error_tracking: A flag to track if the message is an error.
         """
-        color = "black"
+        def update_text_area():
+            color = "black"
+            for key, value in color_code.items():
+                if key in message.lower():
+                    color = value
+                    break
+                if error_tracking and key in message.lower():
+                    self.has_errors = True
 
-        for key, value in color_code.items():
-            if key in message.lower():
-                color = value
-                break
-            if error_tracking and key in message.lower():
-                self.has_errors = True
+            tag = f"tag_{self.text_area.index(tk.END)}"
+            self.text_area.insert(tk.END, message + "\n", (tag,))
+            self.text_area.tag_config(tag, foreground=color)
+            self.text_area.see(tk.END)
 
-        tag = f"tag_{self.text_area.index(tk.END)}"
-        self.text_area.insert(tk.END, message + "\n", (tag,))
-        self.text_area.tag_config(tag, foreground=color)
-        self.text_area.see(tk.END)
+        self.after(0, update_text_area)
 
     def __show_completion_popup(self):
         self.after(0, self.__show_popup)
@@ -216,14 +224,9 @@ class FlowPanel(tk.Tk):
         else:
             messagebox.showinfo(
                 "Completion Status", "Process completed successfully without failures.")
-        self.has_errors = False
+        self.has_errors = False  # Reset the flag
 
-    def prompt_to_proceed(self):
-        """ Prompts the user to proceed to the next step.
-        """
-        if self.popup_open:
-            return
-
+    def confirm_proceed(self):
         def proceed():
             self.confirm_to_proceed.set()
             self.popup_open = False
@@ -231,9 +234,8 @@ class FlowPanel(tk.Tk):
 
         def exit_process():
             self.confirm_to_proceed.clear()
-            # message 'exited by user' is appended to the text area
             self.append_message("Process exited by user.")
-            self.__enable_inputs()
+            self.after(0, self.__enable_inputs_after_thread)
             self.popup_open = False
             popup.destroy()
 
@@ -255,39 +257,47 @@ class FlowPanel(tk.Tk):
         button_frame.pack(pady=10)
 
         self.stop_button.config(state=tk.DISABLED)
-
         popup.protocol("WM_DELETE_WINDOW", exit_process)
         self.confirm_to_proceed.wait()
         self.stop_button.config(state=tk.NORMAL)
 
+    def __on_close(self):
+        if self.process_thread and self.process_thread.is_alive():
+            messagebox.showwarning(
+                "Warning", "Please use the stop button to stop the process before closing the application.")
+        else:
+            self.__destroy()
+
     def __destroy(self):
         if messagebox.askokcancel("Quit", "Do you want to quit?"):
             self.stop_event.set()  # Signal threads to stop
-            super().destroy()
+            self.quit()  # Properly quit Tkinter main loop
+            self.destroy()  # Destroy the main window
+
+
+def dummy_run_function(flow_panel_instance):
+    import time
+    for i in range(10):
+        if flow_panel_instance.should_stop:
+            break
+        time.sleep(1)
+        flow_panel_instance.update_progress(i + 1, 10)
+        flow_panel_instance.append_message(f"Step {i+1} completed.", {
+                                           "warning": "orange", "error": "red", "pass": "green", "fail": "red"}, error_tracking=True)
+    flow_panel_instance.__show_completion_popup()
 
 
 if __name__ == "__main__":
-
-    def example_run_function(panel: FlowPanel):
-        panel.update_progress(0, 10)
-        for i in range(10):
-            if panel.should_stop or panel.stop_event.is_set():
-                break
-            time.sleep(1)
-            panel.update_progress(i + 1, 10)
-            panel.append_message(f"Step pass {i + 1} completed.")
-        panel.append_message("Process finished.")
-
-    gui = FlowPanel(
-        title_short="Test Panel",
-        title_long="Test Panel GUI",
-        list_descriptions=["Run a test process", "with multiple steps."],
+    app = FlowPanel(
+        title_short="Short Title",
+        title_long="This is the Long Title",
+        list_descriptions=["Description 1", "Description 2"],
         list_user_entries=[
             ["Input 1", "entry", True, None],
             ["Input 2", "combobox", False, ["Option 1", "Option 2"]],
-            ["Input 3", "checkbox", False, None],
+            ["Input 3", "checkbox", False, None]
         ],
-        run_function=example_run_function,
-        help="This is an example help text."
+        run_function=dummy_run_function,
+        help="This is a help text."
     )
-    gui.mainloop()
+    app.mainloop()

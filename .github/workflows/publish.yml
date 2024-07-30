@@ -2,12 +2,15 @@ name: Publish Package
 
 on:
   push:
-    branches:
-      - main  # Change this to your default branch if it's different
+    tags:
+      - "*"
 
 jobs:
-  build:
+  pypi-publish:
+    name: Upload release to PyPI
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
 
     steps:
     - name: Checkout code
@@ -21,15 +24,11 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install setuptools wheel twine
+        pip install setuptools wheel
 
     - name: Build package
       run: |
         python setup.py sdist bdist_wheel
 
     - name: Publish package to PyPI
-      env:
-        TWINE_USERNAME: __token__  # This tells twine to use the API token for authentication
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}  # GitHub secret storing the PyPI API token
-      run: |
-        twine upload dist/*
+      uses: pypa/gh-action-pypi-publish@release/v1

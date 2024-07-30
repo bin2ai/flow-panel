@@ -27,20 +27,23 @@ Here’s a basic example of how to use the FlowPanel class:
 
 ```python
 import time
-from flow_panel.flow_panel import FlowPanel
+from flow_panel import FlowPanel
 
-if __name__ == "__main__":
 
-    def example_run_function(panel: FlowPanel):
-        panel.update_progress(0, 10)
-        for i in range(10):
-            if panel.should_stop or panel.stop_event.is_set():
-                break
-            time.sleep(1)
-            panel.update_progress(i + 1, 10)
-            panel.append_message(f"Step pass {i + 1} completed.")
+def example_run_function(panel: FlowPanel):
+    panel.update_progress(0, 10)
+    for i in range(10):
+        if panel.should_stop or panel.stop_event.is_set():
+            panel.append_message("Process stopped by user.")
+            break
+        time.sleep(1)
+        panel.update_progress(i + 1, 10)
+        panel.append_message(f"Step pass {i + 1} completed.")
+    if not panel.should_stop:
         panel.append_message("Process finished.")
 
+
+if __name__ == "__main__":
     gui = FlowPanel(
         title_short="Test Panel",
         title_long="Test Panel GUI",
